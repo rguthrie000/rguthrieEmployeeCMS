@@ -50,11 +50,12 @@
 //*   Dependencies   *
 //********************
 
-const clear     = require("clear");
-const chalk     = require("chalk");
-const figlet    = require("figlet");
-const inquirer  = require('inquirer');
-const dbQuery   = require("./db/mysqlQueries.js");
+const clear       = require("clear");
+const chalk       = require("chalk");
+const figlet      = require("figlet");
+const inquirer    = require('inquirer');
+const dbQuery     = require("./db/mysqlQueries.js");
+const QueryObject = require("./lib/ClassLib.js");
 
 // *@*@*@ TO USE YOUR mysqlConnect.js, WITH YOUR USERNAME AND PASSWORD @*@*@*
 
@@ -93,49 +94,145 @@ function prompt() {
 // not pushed. I have provided 'mysqlConnect_inspect.js' to show 
 // the code without providing defaults for username and password.
 
-let queryObj = {
-     table: '',
-     idCols:  [],    // array of column name strings
-     idVals:  [],    // array of values to match, corresponds to idCols.
-     setCols: [],    // array of column name strings
-     setVals: []     // array of values to set, corresponds to setCols.
-}
+let queryObj = new QueryObject();
 
-// prompt();
-// query.openMySQL('employee_db'); 
+function promptList   (question,choices) { return inquirer.prompt([{name:"str"   ,type:"list"   ,message:question, choices:choices}])}
+function promptString (question)         { return inquirer.prompt([{name:"str"   ,type:"input"  ,message:question}]);}
+function promptBinary (question)         { return inquirer.prompt([{name:"yesNo" ,type:"confirm",message:question}]);}
 
 main(); async function main() {
-    await dbQuery.dbQuery('selectDept');
-
-    queryObj.idVals[0] = 2;
-    await dbQuery.dbQuery('selectRoles',queryObj);
-
-    await dbQuery.dbQuery('selectEmployees',queryObj);
-
-    // queryObj.table = 'departments';
-    // queryObj.idCols[0]  = 'dept_name'; queryObj.idVals[0]  = 'Sales';
-    // queryObj.setCols[0] = 'dept_name'; queryObj.setVals[0] = 'Marketing';
-    // await dbQuery.dbQuery('update',queryObj);
-
-    // await dbQuery.dbQuery('selectDept');
-
-    queryObj.table = 'employees';
-    queryObj.idCols[0]  = 'emp_lastname' ; queryObj.idVals[0]  = 'Frustrated';
-    queryObj.idCols[1]  = 'emp_firstname'; queryObj.idVals[1]  = 'Alice';
-    await dbQuery.dbQuery('delete',queryObj);
-
-    queryObj.idCols = [];
-    await dbQuery.dbQuery('selectEmployees',queryObj);
-
-    queryObj.table = 'employees';
-    queryObj.setCols[0]  = 'emp_lastname' ; queryObj.setVals[0]  = 'Frustrated';
-    queryObj.setCols[1]  = 'emp_firstname'; queryObj.setVals[1]  = 'Alice';
-    queryObj.setCols[2]  = 'role_id'      ; queryObj.setVals[2]  = 4;
-    queryObj.setCols[3]  = 'emp_mgr_id'   ; queryObj.setVals[3]  = 2;
-    await dbQuery.dbQuery('insert',queryObj);
-
-    queryObj.idCols = [];
-    await dbQuery.dbQuery('selectEmployees',queryObj);
+    prompt();
+    let exit = false;
+    let res;
+    let match;
+    while (!exit)
+    {
+        let sel = await promptList("What next?",['exit','view','add','update','remove']);
+        switch (sel.str)
+        {
+            case 'exit': 
+                dbQuery.closeMySQL(); 
+                exit = true;
+                break;
+            case 'view':
+                sel = await promptList("View?",['*','departments','departments & roles','employees','managers']);
+                switch (sel.str)
+                {
+                    case '*':
+                        queryObj.idCols = [];
+                        res = await dbQuery.dbQuery('selectEmployees',queryObj);
+                        if (res.length) {
+                            console.table(res);
+                        }
+                        break;
+                    case 'departments':
+                        res = await dbQuery.dbQuery('selectDept',queryObj);
+                        if (res.length) {
+                            console.table(res);
+                        }
+                        break;    
+                    case 'departments & roles':
+                        res = await dbQuery.dbQuery('selectDept');
+                        let deptList = res.map((elt) => {return(elt.dept_name)});
+                        deptList.unshift("*");
+                        sel = await promptList("Departments",deptList);
+                        queryObj.idVals = [];
+                        if (sel.str != "*") {
+                            deptList.shift();
+                            match = deptList.findIndex((elt) => {return(elt == sel.str);});
+                            queryObj.idVals.push(deptList[match]);
+                        }
+                        res = await dbQuery.dbQuery('selectRoles',queryObj);
+                        if (res.length) {
+                            console.table(res);
+                        }
+                        break;
+                    case 'employees':
+                        queryObj.idCols = [];
+                        res = await dbQuery.dbQuery('selectEmployees',queryObj);
+                        let empList = res.map((elt) => {return (`${elt.emp_lastname}, ${elt.emp_firstname}`)});
+                        sel = await promptList("Selection?",empList);
+                        var namesArr = sel.str.split(',');
+                        queryObj.idCols[0] = 'emp_lastname' ; queryObj.idVals[0] = namesArr[0].trim();
+                        queryObj.idCols[1] = 'emp_firstname'; queryObj.idVals[1] = namesArr[1].trim();
+                        res = await dbQuery.dbQuery('selectEmployees',queryObj);
+                        if (res.length) {
+                            console.table(res);
+                        }
+                        break;    
+                    case 'managers':
+                        queryObj.idCols[0] = 'emp_manager'; queryObj.idVals[0] = 1;
+                        res = await dbQuery.dbQuery('selectEmployees',queryObj);
+                        let mgrList = res.map((elt) => {return elt.emp_lastname});
+                        sel = await promptList("Manager Name?",mgrList);
+                        match = mgrList.findIndex((elt) => {return(elt == sel.str);});
+                        queryObj.idCols[0] = 'emp_mgr_id'; queryObj.idVals[0] = res[match].emp_id;
+                        res = await dbQuery.dbQuery('selectEmployees',queryObj);
+                        if (res.length) {
+                            console.table(res);
+                        }
+                        break;
+                }
+                break;
+            case 'add':
+                let dB = await promptList("Which would you like to add?",['department','role','employee', 'abort add']);
+                switch (dB.str)
+                {
+                    case 'department':
+                        queryObj.table = 'departments';
+                        sel = await promptString("Department Name?");
+                        queryObj.setCols[0]  = 'dept_name'; queryObj.setVals[0]  = sel.str;
+                        await dbQuery.dbQuery('insert',queryObj);
+                        break;
+                    case 'role':
+                        queryObj.table = 'roles';
+                        queryObj.setCols[0] = 'role_title'; 
+                        sel = await promptString("Job title?");
+                        queryObj.setVals[0] = sel.str;
+                        queryObj.setCols[1] = 'role_salary'; 
+                        sel = await promptString("Annual salary?");
+                        queryObj.setVals[1] = sel.str;
+                        queryObj.setCols[2] = 'role_manager'; 
+                        sel = await promptBinary("Manager?");
+                        queryObj.setVals[2] = sel.yesNo? 1:0;
+                        let res = await dbQuery.dbQuery('selectDept');
+                        let deptList = res.map((elt) => {return elt.dept_name});
+                        sel = await promptList("Department?",deptList);
+                        match = deptList.findIndex((elt) => {return(elt == sel.str);})
+                        queryObj.setCols[3]  = 'dept_id'; 
+                        queryObj.setVals[3]  = res[match].dept_id;
+                        await dbQuery.dbQuery('insert',queryObj);
+                        break;
+                    case 'employee':
+                        queryObj.table = 'employees';
+                        queryObj.setCols[0]  = 'emp_lastname' ; 
+                        sel = await promptString("Last Name?");
+                        queryObj.setVals[0]  = sel.str;
+                        queryObj.setCols[1]  = 'emp_firstname'; 
+                        sel = await promptString("First Name?");
+                        queryObj.setVals[1]  = sel.str;
+                        queryObj.idVals = [];
+                        let result = await dbQuery.dbQuery('selectRoles',queryObj);
+                        console.log(result);
+                        let roleList = result.map((elt) => {return elt.role_title});
+                        sel = await promptList("Job Title?",roleList);
+                        match = roleList.findIndex((elt) => {return(elt == sel.str);})
+                        queryObj.setCols[2]  = 'role_id'      ; queryObj.setVals[2] = result[match].role_id;
+                        queryObj.setCols[3]  = 'emp_manager'  ; queryObj.setVals[3] = result[match].role_manager;
+                        queryObj.idCols[0]   = 'emp_manager'  ; queryObj.idVals[0] = 1;
+                        result = await dbQuery.dbQuery('selectEmployees',queryObj);
+                        let mgrList = result.map((elt) => {return elt.emp_lastname});
+                        sel = await promptList("Manager Name?",mgrList);
+                        match = mgrList.findIndex((elt) => {return(elt == sel.str);});
+                        queryObj.setCols[4]  = 'emp_mgr_id'   ; queryObj.setVals[4]  = result[match].emp_id;
+                        await dbQuery.dbQuery('insert',queryObj);
+                        break;
+                    default:
+                        break;    
+                }
+            default: break;    
+        }
+    }
 
     dbQuery.closeMySQL();
 }

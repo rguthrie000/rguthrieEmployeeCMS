@@ -64,28 +64,32 @@ async function dbQuery(cmd,queryObj) {
             // READ    
             case 'selectDept':
                 res = await pool.query(`select * from departments `);
-                console.table(res);
+                // if (res.length) {
+                //    console.table(res);
+                // }
+                return(res);
                 break;
             case 'selectRoles':
                 queryStr = 
                     `select * from (
                         select
-                            dept_name, role_title, role_salary
+                            dept_name, role_id, role_title, role_salary, role_manager
                         from departments inner join roles using (dept_id) `;
                 if (queryObj.idVals.length) {
-                    queryStr += `where dept_id = ${queryObj.idVals[0]}`;
+                    queryStr += `where dept_name = "${queryObj.idVals[0]}"`;
                 }
-                queryStr += `) all_data;`;
+                queryStr += ` order by dept_name) all_data;`;
                 res = await pool.query(queryStr);
-                if (res.length) {
-                    console.table(res);
-                }
+                // if (res.length) {
+                //     console.table(res);
+                // }
+                return(res);
                 break;
             case 'selectEmployees':
                 queryStr = 
                     `select * from (
                         select
-                            dept_name, emp_lastname, emp_firstname, role_title, role_salary, emp_id, emp_mgr_id
+                            dept_name, emp_lastname, emp_firstname, role_title, role_salary, emp_id, emp_manager, emp_mgr_id
                         from
                             departments inner join roles using (dept_id) inner join employees using (role_id) `;
                 if (queryObj.idCols.length) {
@@ -97,7 +101,10 @@ async function dbQuery(cmd,queryObj) {
                 }
                 queryStr += ` order by dept_name, role_salary desc, emp_lastname) all_data;`;
                 res = await pool.query(queryStr);
-                console.table(res);
+                // if (res.length) {
+                //     console.table(res);
+                // }
+                return(res);
                 break;
             // UPDATE
             case 'update':
