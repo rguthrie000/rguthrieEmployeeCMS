@@ -1,5 +1,5 @@
 // Employee CMS, UCF-ORL-FSF HW 12
-// rguthrie, 20200112
+// rguthrie, 20200114
 
 //
 //*@*@*@   --- REQUIRES MYSQL CONNECTION. ---   @*@*@*
@@ -70,13 +70,20 @@ const openMySQL = require('./db/mysqlConnect.js');
 //*   Globals   *
 //***************
 
+// temp variables, here to simplify scope considerations
+let res;
+let sel;
+let match;
+let deptList;
+let mgrList;
+let empList;
 
 //*****************
 //*   Functions   *
 //*****************
 
-// prompt() is the endpoint of the response handling for all database queries.
-function prompt() {
+// headerScreen() is the endpoint of the response handling for all database queries.
+function headerScreen() {
     clear();
     console.log(chalk.yellow(figlet.textSync('Employee Database', { horizontalLayout: 'full' })));
     console.log(chalk.green('Welcome!\n'));
@@ -101,13 +108,12 @@ function promptString (question)         { return inquirer.prompt([{name:"str"  
 function promptBinary (question)         { return inquirer.prompt([{name:"yesNo" ,type:"confirm",message:question}]);}
 
 main(); async function main() {
-    prompt();
+    headerScreen();
+
     let exit = false;
-    let res;
-    let match;
     while (!exit)
     {
-        let sel = await promptList("What next?",['exit','view','add','update','remove']);
+        sel = await promptList("What next?",['exit','view','add','update','remove']);
         switch (sel.str)
         {
             case 'exit': 
@@ -121,56 +127,46 @@ main(); async function main() {
                     case '*':
                         queryObj.idCols = [];
                         res = await dbQuery.dbQuery('selectEmployees',queryObj);
-                        if (res.length) {
-                            console.table(res);
-                        }
+                        if (res.length) {console.table(res);}
                         break;
                     case 'departments':
                         res = await dbQuery.dbQuery('selectDept',queryObj);
-                        if (res.length) {
-                            console.table(res);
-                        }
+                        if (res.length) {console.table(res);}
                         break;    
                     case 'departments & roles':
+                        queryObj.idVals = [];
                         res = await dbQuery.dbQuery('selectDept');
-                        let deptList = res.map((elt) => {return(elt.dept_name)});
+                        deptList = res.map((elt) => {return(elt.dept_name)});
                         deptList.unshift("*");
                         sel = await promptList("Departments",deptList);
-                        queryObj.idVals = [];
                         if (sel.str != "*") {
                             deptList.shift();
                             match = deptList.findIndex((elt) => {return(elt == sel.str);});
                             queryObj.idVals.push(deptList[match]);
                         }
                         res = await dbQuery.dbQuery('selectRoles',queryObj);
-                        if (res.length) {
-                            console.table(res);
-                        }
+                        if (res.length) {console.table(res);}
                         break;
                     case 'employees':
                         queryObj.idCols = [];
                         res = await dbQuery.dbQuery('selectEmployees',queryObj);
-                        let empList = res.map((elt) => {return (`${elt.emp_lastname}, ${elt.emp_firstname}`)});
+                        empList = res.map((elt) => {return (`${elt.emp_lastname}, ${elt.emp_firstname}`)});
                         sel = await promptList("Selection?",empList);
-                        var namesArr = sel.str.split(',');
+                        let namesArr = sel.str.split(',');
                         queryObj.idCols[0] = 'emp_lastname' ; queryObj.idVals[0] = namesArr[0].trim();
                         queryObj.idCols[1] = 'emp_firstname'; queryObj.idVals[1] = namesArr[1].trim();
                         res = await dbQuery.dbQuery('selectEmployees',queryObj);
-                        if (res.length) {
-                            console.table(res);
-                        }
+                        if (res.length) {console.table(res);}
                         break;    
                     case 'managers':
                         queryObj.idCols[0] = 'emp_manager'; queryObj.idVals[0] = 1;
                         res = await dbQuery.dbQuery('selectEmployees',queryObj);
-                        let mgrList = res.map((elt) => {return elt.emp_lastname});
+                        mgrList = res.map((elt) => {return elt.emp_lastname});
                         sel = await promptList("Manager Name?",mgrList);
                         match = mgrList.findIndex((elt) => {return(elt == sel.str);});
                         queryObj.idCols[0] = 'emp_mgr_id'; queryObj.idVals[0] = res[match].emp_id;
                         res = await dbQuery.dbQuery('selectEmployees',queryObj);
-                        if (res.length) {
-                            console.table(res);
-                        }
+                        if (res.length) {console.table(res);}
                         break;
                 }
                 break;
@@ -195,8 +191,8 @@ main(); async function main() {
                         queryObj.setCols[2] = 'role_manager'; 
                         sel = await promptBinary("Manager?");
                         queryObj.setVals[2] = sel.yesNo? 1:0;
-                        let res = await dbQuery.dbQuery('selectDept');
-                        let deptList = res.map((elt) => {return elt.dept_name});
+                        res = await dbQuery.dbQuery('selectDept');
+                        deptList = res.map((elt) => {return elt.dept_name});
                         sel = await promptList("Department?",deptList);
                         match = deptList.findIndex((elt) => {return(elt == sel.str);})
                         queryObj.setCols[3]  = 'dept_id'; 
@@ -212,8 +208,7 @@ main(); async function main() {
                         sel = await promptString("First Name?");
                         queryObj.setVals[1]  = sel.str;
                         queryObj.idVals = [];
-                        let result = await dbQuery.dbQuery('selectRoles',queryObj);
-                        console.log(result);
+                        result = await dbQuery.dbQuery('selectRoles',queryObj);
                         let roleList = result.map((elt) => {return elt.role_title});
                         sel = await promptList("Job Title?",roleList);
                         match = roleList.findIndex((elt) => {return(elt == sel.str);})
@@ -221,7 +216,7 @@ main(); async function main() {
                         queryObj.setCols[3]  = 'emp_manager'  ; queryObj.setVals[3] = result[match].role_manager;
                         queryObj.idCols[0]   = 'emp_manager'  ; queryObj.idVals[0] = 1;
                         result = await dbQuery.dbQuery('selectEmployees',queryObj);
-                        let mgrList = result.map((elt) => {return elt.emp_lastname});
+                        mgrList = result.map((elt) => {return elt.emp_lastname});
                         sel = await promptList("Manager Name?",mgrList);
                         match = mgrList.findIndex((elt) => {return(elt == sel.str);});
                         queryObj.setCols[4]  = 'emp_mgr_id'   ; queryObj.setVals[4]  = result[match].emp_id;
@@ -230,6 +225,156 @@ main(); async function main() {
                     default:
                         break;    
                 }
+                break;
+            case 'update': 
+                let table = 
+                await promptList(
+`The database will cascade updates based on dependency relationships, so please proceed with caution.
+ What would you like to update?`,['department','role','employee', 'abort add']);
+                switch (table.str)
+                {
+                    case 'department':
+                        queryObj.table = 'departments';
+                        let ans = await dbQuery.dbQuery('selectDept',queryObj);
+                        let deptArr = ans.map((elt) => {return(elt.dept_name)});
+                        sel = await promptList("Department Name?",deptArr);
+                        queryObj.idCols[0] = "dept_name"; queryObj.idVals[0] = sel.str;
+                        sel = await promptString("New department name? <name> | nc");
+                        if (sel.str.toLowerCase() != 'nc') {
+                            queryObj.setCols[0]  = 'dept_name'; 
+                            queryObj.setVals[0]  = sel.str;
+                            await dbQuery.dbQuery('update',queryObj);
+                            console.log(`Updated ${queryObj.idVals[0]} to ${sel.str}`);
+                        } else {
+                            console.log(`No change to ${queryObj.idVals[0]}`);
+                        }
+                        break;
+                    case 'role':
+                        queryObj.table = 'roles';
+                        queryObj.idVals = [];
+                        res = await dbQuery.dbQuery('selectDept');
+                        deptList = res.map((elt) => {return(elt.dept_name)});
+                        deptIDList = res.map((elt) => {return(elt.dept_id)});
+                        sel = await promptList("Departments",deptList);
+                        match = deptList.findIndex((elt) => {return(elt == sel.str);});
+                        let inDept = sel.str;
+                        let inDeptID = res[match].dept_id;
+                        queryObj.idVals[0] = deptList[match];
+                        res = await dbQuery.dbQuery('selectRoles',queryObj);
+                        if (res.length) {console.table(res);}
+                        let rolesList = res.map((elt) => {return(elt.role_title)});
+                        sel = await promptList("Role to change?",rolesList);
+                        match = rolesList.findIndex((elt) => {return(elt == sel.str)});
+
+                        let i = 0;
+                        queryObj.setCols[0] = 'role_title'; 
+                        queryObj.setVals[0] = res[match].role_title;
+                        sel = await promptString(`New title (${res[match].role_title})? <title> | nc`);
+                        if (sel.str.toLowerCase() != 'nc') {
+                            i++;
+                            queryObj.setVals[0] = sel.str;
+                        }
+
+                        queryObj.setCols[1] = 'role_salary'; 
+                        queryObj.setVals[1] = res[match].role_salary;
+                        sel = await promptString(`Annual salary (${res[match].role_salary})? <salary>| nc`);
+                        if (sel.str.toLowerCase() != 'nc') {
+                            i++;
+                            queryObj.setVals[1] = sel.str;
+                        }
+
+                        queryObj.setCols[2] = 'role_manager'; 
+                        queryObj.setVals[2] = res[match].role_manager;
+                        sel = await promptBinary(`Toggle Manager status (${res[match].role_manager})? `);
+                        if (sel.yesNo) {
+                            i++;
+                            queryObj.setVals[2] ^= 1;
+                        }
+
+                        queryObj.setCols[3] = 'dept_id';
+                        queryObj.setVals[3] = inDeptID;
+                        sel = await promptList(`Department (${deptList[match]})`,deptList);
+                        if (sel != deptList[match]) {
+                            i++;
+                            match = deptList.findIndex((elt) => {return(elt == sel.str);});
+                            queryObj.setVals[3] = deptIDList[match];
+                        }
+
+                        if (i) {
+                            await dbQuery.dbQuery('update',queryObj);
+                            console.log(`Updated with ${i} change${i==1? '':'s'}`)
+                        } else {
+                            console.log(`No change`)
+                        }
+                        break;
+                    case 'employee':
+                        queryObj.table = 'employees';
+                        queryObj.idCols = [];
+                        res = await dbQuery.dbQuery('selectEmployees',queryObj);
+                        empList = res.map((elt) => {return (`${elt.emp_lastname}, ${elt.emp_firstname}`)});
+                        sel = await promptList("Selection?",empList);
+                        let namesArr = sel.str.split(',');
+                        queryObj.idCols[0] = 'emp_lastname' ; queryObj.idVals[0] = namesArr[0].trim();
+                        queryObj.idCols[1] = 'emp_firstname'; queryObj.idVals[1] = namesArr[1].trim();
+                        res = await dbQuery.dbQuery('selectEmployees',queryObj);
+                        let emp_mgr_id = res[0].emp_mgr_id;
+                        let emp_manager = res[0].emp_manager;
+                        let emp_role_id = res[0].role_id;
+
+                        let j = 0;
+                        queryObj.setCols[0] = 'emp_lastname'; 
+                        queryObj.setVals[0] = namesArr[0];
+                        sel = await promptString(`New Last Name (${namesArr[0]})? <lastname> | nc`);
+                        if (sel.str.toLowerCase() != 'nc') {
+                            j++;
+                            queryObj.setVals[0] = sel.str;
+                        }
+
+                        queryObj.setCols[1] = 'emp_firstname'; 
+                        queryObj.setVals[1] = namesArr[1];
+                        sel = await promptString(`New First Name (${namesArr[1]})? <firstname>| nc`);
+                        if (sel.str.toLowerCase() != 'nc') {
+                            j++;
+                            queryObj.setVals[1] = sel.str;
+                        }
+
+                        queryObj.setCols[2] = 'emp_mgr_id';
+                        queryObj.setVals[2] = Number(emp_mgr_id);
+                        sel = await promptString(`Manager ID (${emp_mgr_id}) <manager id> | nc`);
+                        if (sel.str.toLowerCase() != 'nc') {
+                            j++;
+                            queryObj.setVals[2] = Number(sel.str);
+                        }
+
+                        queryObj.setCols[3] = 'emp_manager'; 
+                        queryObj.setVals[3] = emp_manager;
+                        sel = await promptBinary(`Toggle Manager status (${emp_manager})? `);
+                        if (sel.yesNo) {
+                            j++;
+                            queryObj.setVals[3] ^= 1;
+                        }
+
+                        queryObj.setCols[4] = 'role_id';
+                        queryObj.setVals[4] = Number(emp_role_id);
+                        sel = await promptString(`New role_id (${emp_role_id}) <role id> | nc`);
+                        if (sel.str.toLowerCase() != nc) {
+                            j++;
+                            queryObj.setVals[4] = Number(sel.str);
+                        }
+
+                        if (j) {
+                            await dbQuery.dbQuery('update',queryObj);
+                            console.log(`Updated with ${j} change${j==1? '':'s'}`)
+                        } else {
+                            console.log(`No change`)
+                        }
+                        break;
+                    default:
+                        break;    
+                }
+                break;
+            case 'remove':
+                break;    
             default: break;    
         }
     }

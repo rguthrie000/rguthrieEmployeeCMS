@@ -89,7 +89,7 @@ async function dbQuery(cmd,queryObj) {
                 queryStr = 
                     `select * from (
                         select
-                            dept_name, emp_lastname, emp_firstname, role_title, role_salary, emp_id, emp_manager, emp_mgr_id
+                            dept_name, emp_lastname, emp_firstname, role_title, role_salary, emp_id, emp_manager, role_id, emp_mgr_id
                         from
                             departments inner join roles using (dept_id) inner join employees using (role_id) `;
                 if (queryObj.idCols.length) {
@@ -124,7 +124,7 @@ async function dbQuery(cmd,queryObj) {
                     res = await pool.query(queryStr+whereStr);
                 }
                 else {
-                    summary = 'update failed, record to update not found.'
+                    summary = 'update failed, record not found.'
                 }
                 break;
             // DELETE    

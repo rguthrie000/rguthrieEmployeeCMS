@@ -13,7 +13,8 @@ create table roles (
 	role_manager boolean default false,
 	dept_id int,
     constraint fk_department
-	foreign key (dept_id) references departments(dept_id)
+	foreign key (dept_id) references departments(dept_id) 
+	on delete cascade on update cascade
 );
 create table employees (
 	emp_id int not null auto_increment primary key,
@@ -23,5 +24,6 @@ create table employees (
 	emp_manager boolean default false,
 	role_id int,
 	constraint fk_emp_role_id foreign key (role_id) references roles(role_id)
+	on delete cascade on update cascade
 );
 
