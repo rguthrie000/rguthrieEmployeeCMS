@@ -75,6 +75,7 @@ let res;
 let sel;
 let match;
 let deptList;
+let roleList;
 let mgrList;
 let empList;
 
@@ -88,7 +89,6 @@ function headerScreen() {
     console.log(chalk.yellow(figlet.textSync('Employee Database', { horizontalLayout: 'full' })));
     console.log(chalk.green('Welcome!\n'));
 }
-
 
 //***************
 //*   Startup   *
@@ -209,7 +209,7 @@ main(); async function main() {
                         queryObj.setVals[1]  = sel.str;
                         queryObj.idVals = [];
                         result = await dbQuery.dbQuery('selectRoles',queryObj);
-                        let roleList = result.map((elt) => {return elt.role_title});
+                        roleList = result.map((elt) => {return elt.role_title});
                         sel = await promptList("Job Title?",roleList);
                         match = roleList.findIndex((elt) => {return(elt == sel.str);})
                         queryObj.setCols[2]  = 'role_id'      ; queryObj.setVals[2] = result[match].role_id;
@@ -227,11 +227,10 @@ main(); async function main() {
                 }
                 break;
             case 'update': 
-                let table = 
-                await promptList(
+                sel = await promptList(
 `The database will cascade updates based on dependency relationships, so please proceed with caution.
  What would you like to update?`,['department','role','employee', 'abort add']);
-                switch (table.str)
+                switch (sel.str)
                 {
                     case 'department':
                         queryObj.table = 'departments';
@@ -262,9 +261,9 @@ main(); async function main() {
                         queryObj.idVals[0] = deptList[match];
                         res = await dbQuery.dbQuery('selectRoles',queryObj);
                         if (res.length) {console.table(res);}
-                        let rolesList = res.map((elt) => {return(elt.role_title)});
-                        sel = await promptList("Role to change?",rolesList);
-                        match = rolesList.findIndex((elt) => {return(elt == sel.str)});
+                        roleList = res.map((elt) => {return(elt.role_title)});
+                        sel = await promptList("Role to change?",roleList);
+                        match = roleList.findIndex((elt) => {return(elt == sel.str)});
 
                         let i = 0;
                         queryObj.setCols[0] = 'role_title'; 
@@ -374,6 +373,75 @@ main(); async function main() {
                 }
                 break;
             case 'remove':
+                sel = await promptList(
+`The database will cascade deletions based on dependency relationships, so please proceed with caution.
+ What would you like to remove?`,['Abort Delete','department','role','employee']);
+                switch (sel.str)
+                {
+                    case 'department':
+                        queryObj.table = 'departments';
+                        res = await dbQuery.dbQuery('selectDept',queryObj);
+                        deptList = res.map((elt) => {return(elt.dept_name)});
+                        deptList.unshift('Abort Delete');
+                        sel = await promptList("Department Name?",deptList);
+                        if (sel.str != 'Abort Delete') {
+                            match = deptList.findIndex((elt) => {return(elt == sel.str)}) - 1;
+                            queryObj.idCols[0] = 'dept_id';
+                            queryObj.idVals[0] = res[match].dept_id;
+                            await dbQuery.dbQuery('delete',queryObj);
+                            console.log(`Deleted department ${sel.str}.`);
+                        } else {
+                            console.log('Delete aborted.');
+                        }
+                        break;
+                    case 'role':
+                        queryObj.table = 'departments';
+                        res = await dbQuery.dbQuery('selectDept',queryObj);
+                        deptList = res.map((elt) => {return(elt.dept_name)});
+                        deptList.unshift('Abort Delete');
+                        sel = await promptList("Department Name?",deptList);
+                        if (sel.str != 'Abort Delete') {
+                            match = deptList.findIndex((elt) => {return(elt == sel.str)}) - 1;
+                            queryObj.idVals[0] = deptList[match];
+                            res = await dbQuery.dbQuery('selectRoles',queryObj);
+                            if (res.length) {console.table(res);}
+                            roleList = res.map((elt) => {return(elt.role_title)});
+                            roleList.unshift('Abort Delete');
+                            sel = await promptList("Role to delete?",roleList);
+                            if (sel.str != 'Abort Delete')  {
+                                match = roleList.findIndex((elt) => {return(elt == sel.str)}) - 1;
+                                queryObj.table = 'roles';
+                                queryObj.idCols[0] = 'role_id';
+                                queryObj.idVals[0] = res[match].role_id;
+                                await dbQuery.dbQuery('delete',queryObj);
+                                console.log(`Deleted role ${sel.str}.`);
+                            } else {
+                                console.log('Delete aborted.');
+                            }
+                        }
+                        break;
+                    case 'employee':
+                        queryObj.table = 'employees';
+                        queryObj.idCols = [];
+                        res = await dbQuery.dbQuery('selectEmployees',queryObj);
+                        empList = res.map((elt) => {return (`${elt.emp_lastname}, ${elt.emp_firstname}`)});
+                        empList.unshift('Abort Delete');
+                        sel = await promptList("Selection?",empList);
+                        if (sel.str != 'Abort Delete') {
+                            match = empList.findIndex((elt) => {return(elt == sel.str)}) - 1;
+                            queryObj.idCols[0] = 'emp_id';
+                            queryObj.idVals[0] = res[match].emp_id;
+                            console.log(queryObj);
+                            await dbQuery.dbQuery('delete',queryObj);
+                            console.log(`Deleted employee ${sel.str}.`);
+                        } else {
+                                console.log('Delete aborted.');
+                        }
+                        break;
+                    default:
+                        console.log("Delete aborted. No harm, no foul.");
+                        break;    
+                }
                 break;    
             default: break;    
         }

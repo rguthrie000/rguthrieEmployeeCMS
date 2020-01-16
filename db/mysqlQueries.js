@@ -15,22 +15,22 @@ const pool = mysql.createPool( {
 pool.getConnection((err, connection) => {
     if (err) {
         if (err.code === 'PROTOCOL_CONNECTION_LOST') {
-            console.error('Database connection was closed.')
+            console.error('Database connection was closed.');
         }
         if (err.code === 'ER_CON_COUNT_ERROR') {
-            console.error('Database has too many connections.')
+            console.error('Database has too many connections.');
         }
         if (err.code === 'ECONNREFUSED') {
-            console.error('Database connection was refused.')
+            console.error('Database connection was refused.');
         }
     }
-    if (connection) connection.release()
+    if (connection) connection.release();
 })  
 
 function closeMySQL() {pool.end();}
 
 // Promisify for Node.js async/await.
-pool.query = util.promisify(pool.query)
+pool.query = util.promisify(pool.query);
 
 // module.exports = function closeMySQL() {connection.end();}
 // queryObj = {
@@ -129,17 +129,14 @@ async function dbQuery(cmd,queryObj) {
                 break;
             // DELETE    
             case 'delete':
-                queryStr = `select * from ${queryObj.table} `;
-                whereStr = `where `;
+                queryStr = `delete from ${queryObj.table} where `;
                 for (let i = 0; i < queryObj.idCols.length; i++) {
-                    whereStr += `${queryObj.idCols[i]}="${queryObj.idVals[i]}" `;
-                    whereStr += (i < queryObj.idCols.length-1)? 'and ' : '';
+                    queryStr += `${queryObj.idCols[i]}="${queryObj.idVals[i]}" `;
+                    queryStr += (i < queryObj.idCols.length-1)? 'and ' : '';
                 }
-                res = await pool.query(queryStr+whereStr);
-                if (res.length) {
-                    queryStr = `delete from ${queryObj.table} `;
-                    res = await pool.query(queryStr+whereStr);
-                }    
+                console.log(queryStr);
+                res = await pool.query(queryStr);
+                break;
         }
     }
     catch(err) {
